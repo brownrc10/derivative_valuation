@@ -28,20 +28,20 @@ class BarrierMonteCarloSimulation:
         volatility: float,
         barrier: float,
         strike: float,
-        reward_price: float,
         n_simulations: int,
     ):
         self.stock_price = stock_price
         self.risk_free_rate = risk_free_rate
         self.dividend_yield = dividend_yield
         self.volatility = volatility
-        self.reward_price = reward_price
+        self.barrier = barrier
+        self.strike = strike
         self.simulations = n_simulations
         self._time = 3
         self._trading_days = 252
 
     def _barrier_check(self, stock_paths: np.array) -> Tuple[np.array, np.array]:
-        knocked_in = np.any(stock_paths > self.reward_price, axis=1)
+        knocked_in = np.any(stock_paths > self.barrier, axis=1)
         final_stock_prices = stock_paths[knocked_in, -1]
         return final_stock_prices, knocked_in
 
