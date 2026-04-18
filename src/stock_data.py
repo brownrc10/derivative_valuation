@@ -8,7 +8,6 @@ import pandas as pd
 @dataclass
 class StockData:
     stock_file_path: str
-    treasury_file_path: str
     valuation_date: str
     dividend_yield: float = field(default=0.0109)
     risk_free_rate: float = field(default=0.0)
@@ -50,7 +49,8 @@ class StockData:
                 )
                 SELECT
                     annualized_vol,
-                    ({self.dividend_yield} * 4 / spot_price) * 100 AS dividend_yield
+                    ({self.dividend_yield} * 4 / spot_price) * 100 AS dividend_yield,
+                    spot_price
                 FROM params
             """
             result = conn.execute(sql).df()
@@ -82,7 +82,7 @@ class StockData:
                 )
                 SELECT
                     {window_days} AS window_days,
-                    STDDEV(log_return) * SQRT(252 * 78) * 100 AS annualized_vol
+                    STDDEV(log_return) * SQRT(252 * 78) * 100 AS rolling_vol
                 FROM filtered_returns
             """
             result = conn.execute(sql).df()
@@ -90,20 +90,23 @@ class StockData:
 
     def _calculate_risk_free_rate(self, BASE_URL: str, API_KEY: str):
         params = {
-            "apiKey": API_KEY,
-            "date": self.valuation_date,
+            "apiKey": f"{API_KEY}",
+            "date": "2024-04-01",
+            "limit": 100,
+            "sort": "date.asc",
         }
-
         with httpx.Client(params=params) as client:
-            response = client.get(f"{BASE_URL}/fed/v1/treasury-yields")
+            response = client.get(f"{BASE_URL}")
             data = response.json()
-            self.risk_free_rate = data["results"]["yield_2_year"]
+            self.risk_free_rate = data["results"][0]["yield_2_year"]
+            print(self.risk_free_rate)
 
     def summarize(self, BASE_URL: str, API_KEY: str) -> dict:
         hist = self._calculate_historical_volatility()
         rolling = pd.concat(
             [self._calculate_rolling_volatility(d) for d in [90, 180, 252, 504]]
         )
+        print(BASE_URL)
         self._calculate_risk_free_rate(BASE_URL, API_KEY)
 
         self.summary = {
@@ -113,16 +116,16 @@ class StockData:
             "risk_free_rate": self.risk_free_rate,
             "historical_vol": hist["annualized_vol"].iloc[0],
             "rolling_vol_90d": rolling.loc[
-                rolling["window_days"] == 90, "annualized_vol"
+                rolling["window_days"] == 90, "rolling_vol"
             ].iloc[0],
             "rolling_vol_180d": rolling.loc[
-                rolling["window_days"] == 180, "annualized_vol"
+                rolling["window_days"] == 180, "rolling_vol"
             ].iloc[0],
             "rolling_vol_252d": rolling.loc[
-                rolling["window_days"] == 252, "annualized_vol"
+                rolling["window_days"] == 252, "rolling_vol"
             ].iloc[0],
             "rolling_vol_504d": rolling.loc[
-                rolling["window_days"] == 504, "annualized_vol"
+                rolling["window_days"] == 504, "rolling_vol"
             ].iloc[0],
         }
         return self.summary
