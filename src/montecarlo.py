@@ -7,7 +7,7 @@ class BarrierMonteCarloSimulation:
 
     Parameters:
         stock_price (float): The stock price at the opening of the Performance Period
-        risk_free_rate (float): Risk Free Rate calculated using the 3 Year Treasury Yield
+        risk_free_rate (float): Risk Free Rate calculated using the 2 Year Treasury Yield
         dividend_yield (float): Dividend Yield of VOO
         volatility (float): Volatility Calculation Based of Historical Stock Price Data
         reward_price (float): 10% increase of current_stock position
@@ -29,6 +29,7 @@ class BarrierMonteCarloSimulation:
         barrier: float,
         strike: float,
         n_simulations: int,
+        time_years: int = 2,
     ):
         self.stock_price = stock_price
         self.risk_free_rate = risk_free_rate
@@ -37,13 +38,13 @@ class BarrierMonteCarloSimulation:
         self.barrier = barrier
         self.strike = strike
         self.simulations = n_simulations
-        self._time = 3
+        self._time = time_years
         self._trading_days = 252
 
     def _barrier_check(self, stock_paths: np.array) -> Tuple[np.array, np.array]:
         knocked_in = np.any(stock_paths > self.barrier, axis=1)
-        final_stock_prices = stock_paths[knocked_in, -1]
-        return final_stock_prices, knocked_in
+        final_stock_prices_knocked_in = stock_paths[knocked_in, -1]
+        return final_stock_prices_knocked_in, knocked_in
 
     def _percentile_calculations(self, stock_paths: np.array) -> list:
         return np.percentile(stock_paths, [10, 25, 50, 75, 90], axis=0)
