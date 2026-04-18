@@ -29,7 +29,6 @@ class BarrierMonteCarloSimulation:
         barrier: float,
         strike: float,
         n_simulations: int,
-        time_years: int = 2,
     ):
         self.stock_price = stock_price
         self.risk_free_rate = risk_free_rate
@@ -38,7 +37,7 @@ class BarrierMonteCarloSimulation:
         self.barrier = barrier
         self.strike = strike
         self.simulations = n_simulations
-        self._time = time_years
+        self._time = 2
         self._trading_days = 252
 
     def _barrier_check(self, stock_paths: np.array) -> Tuple[np.array, np.array]:
