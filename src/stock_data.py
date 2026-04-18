@@ -99,14 +99,12 @@ class StockData:
             response = client.get(f"{BASE_URL}")
             data = response.json()
             self.risk_free_rate = data["results"][0]["yield_2_year"]
-            print(self.risk_free_rate)
 
     def summarize(self, BASE_URL: str, API_KEY: str) -> dict:
         hist = self._calculate_historical_volatility()
         rolling = pd.concat(
             [self._calculate_rolling_volatility(d) for d in [90, 180, 252, 504]]
         )
-        print(BASE_URL)
         self._calculate_risk_free_rate(BASE_URL, API_KEY)
 
         self.summary = {
