@@ -1,16 +1,25 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 import duckdb
+import httpx
+import pandas as pd
 
 
 @dataclass
 class StockData:
     stock_file_path: str
     treasury_file_path: str
-    closing_date: str
+    valuation_date: str
     dividend_yield: float = field(default=0.0109)
+    risk_free_rate: float = field(default=0.0)
 
-    def calculate_historical_volatility(self):
+    def __post_init__(self):
+        self.summary: dict = {}
+
+    def __repr__(self):
+        return str(self.summary) if self.summary else "StockData not yet summarized."
+
+    def _calculate_historical_volatility(self):
         with duckdb.connect() as conn:
             sql = f"""
                 WITH agg_files AS (
@@ -36,7 +45,7 @@ class StockData:
                     SELECT
                         STDDEV(log_return) * SQRT(252 * 78) * 100 AS annualized_vol,
                         LAST(close ORDER BY window_start)
-                            FILTER (WHERE DATE(window_start) = '{self.closing_date}') AS spot_price
+                            FILTER (WHERE DATE(window_start) = '{self.valuation_date}') AS spot_price
                     FROM filtered_returns
                 )
                 SELECT
@@ -47,14 +56,14 @@ class StockData:
             result = conn.execute(sql).df()
             return result
 
-    def calculate_rolling_volatility(self, window_days: int):
+    def _calculate_rolling_volatility(self, window_days: int):
         with duckdb.connect() as conn:
             sql = f"""
                 WITH agg_files AS (
                     SELECT *
                     FROM read_parquet('{self.stock_file_path}/VOO_*_5min.parquet')
-                    WHERE DATE(window_start) >= (DATE '{self.closing_date}' - INTERVAL '{window_days} days')
-                    AND DATE(window_start) <= DATE '{self.closing_date}'
+                    WHERE DATE(window_start) >= (DATE '{self.valuation_date}' - INTERVAL '{window_days} days')
+                    AND DATE(window_start) <= DATE '{self.valuation_date}'
                     ORDER BY window_start
                 ),
                 log_returns AS (
@@ -79,5 +88,41 @@ class StockData:
             result = conn.execute(sql).df()
             return result
 
-    def calculate_risk_free_rate(self):
-        pass
+    def _calculate_risk_free_rate(self, BASE_URL: str, API_KEY: str):
+        params = {
+            "apiKey": API_KEY,
+            "date": self.valuation_date,
+        }
+
+        with httpx.Client(params=params) as client:
+            response = client.get(f"{BASE_URL}/fed/v1/treasury-yields")
+            data = response.json()
+            self.risk_free_rate = data["results"]["yield_2_year"]
+
+    def summarize(self, BASE_URL: str, API_KEY: str) -> dict:
+        hist = self._calculate_historical_volatility()
+        rolling = pd.concat(
+            [self._calculate_rolling_volatility(d) for d in [90, 180, 252, 504]]
+        )
+        self._calculate_risk_free_rate(BASE_URL, API_KEY)
+
+        self.summary = {
+            "valuation_date": self.valuation_date,
+            "spot_price": hist["spot_price"].iloc[0],
+            "dividend_yield": hist["dividend_yield"].iloc[0],
+            "risk_free_rate": self.risk_free_rate,
+            "historical_vol": hist["annualized_vol"].iloc[0],
+            "rolling_vol_90d": rolling.loc[
+                rolling["window_days"] == 90, "annualized_vol"
+            ].iloc[0],
+            "rolling_vol_180d": rolling.loc[
+                rolling["window_days"] == 180, "annualized_vol"
+            ].iloc[0],
+            "rolling_vol_252d": rolling.loc[
+                rolling["window_days"] == 252, "annualized_vol"
+            ].iloc[0],
+            "rolling_vol_504d": rolling.loc[
+                rolling["window_days"] == 504, "annualized_vol"
+            ].iloc[0],
+        }
+        return self.summary
