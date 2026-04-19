@@ -5,3 +5,4 @@
 /parquet_output
 __pycache__
 uv.lock
+/results

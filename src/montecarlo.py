@@ -10,12 +10,13 @@ class BarrierMonteCarloSimulation:
         risk_free_rate (float): Risk Free Rate calculated using the 2 Year Treasury Yield
         dividend_yield (float): Dividend Yield of VOO
         volatility (float): Volatility Calculation Based of Historical Stock Price Data
-        reward_price (float): 10% increase of current_stock position
+        barrier (float): Conditional that activates knock-in status.
+        strike (float): Value of which the option can be exercised.
         n_simulations (int): Number of simulations to run in the Monte-Carlo Simulation
 
     Methods:
         _barrier_check:
-            Checks if each simulated path ever crosses the barrier
+            Checks if each simulated path ever crosses the barrier.
         simulation:
             Performs the Monte-Carlo simulation based on the initialized parameters
     """
@@ -41,15 +42,41 @@ class BarrierMonteCarloSimulation:
         self._trading_days = 252
 
     def _barrier_check(self, stock_paths: np.array) -> Tuple[np.array, np.array]:
+        """Method: Preforms a barrier check to see if a stock is "knocked-in".
+
+        Parameters:
+            stock_paths(np.array) A matrix containing all the generated stock paths for ths number of simulations.
+        Returns:
+            final_stock_prices_knocked_in: Final stock value for all the paths where stock exceeds the barrier.
+            knocked_in: indicies of knocked-in paths
+        """
         knocked_in = np.any(stock_paths > self.barrier, axis=1)
         final_stock_prices_knocked_in = stock_paths[knocked_in, -1]
         return final_stock_prices_knocked_in, knocked_in
 
     def _percentile_calculations(self, stock_paths: np.array) -> list:
+        """Method: Calculates the percentiles of the stock paths
+
+        Parameters:
+            stock_paths (np.array): All the stock paths from the simulations
+        Returns:
+            Percentile vector
+        """
         return np.percentile(stock_paths, [10, 25, 50, 75, 90], axis=0)
 
     def simulation(self) -> dict:
-        """Method that performs the Monte Carlo simulation"""
+        """Method that performs the Monte Carlo simulation
+
+        Parameters:
+            None
+
+        Returns:
+            payload (dict): Dictionary containing all relevant information from the simulation
+
+        Note:
+
+        """
+
         total_trading_days = int(self._time * self._trading_days)
         delta_t = 1 / self._trading_days
         generated_normal = np.random.standard_normal(
@@ -62,8 +89,9 @@ class BarrierMonteCarloSimulation:
             + self.volatility * np.sqrt(delta_t) * generated_normal
         )
         stock_paths = self.stock_price * np.cumprod(S_t, axis=1)
-        final_stock_price, knocked_in = self._barrier_check(stock_paths)
-        payoffs = np.maximum(final_stock_price - self.strike, 0)
+        final_stock_price_knocked_in, knocked_in = self._barrier_check(stock_paths)
+        # Once Barrier is met the payoff is just a vanilla call
+        payoffs = np.maximum(final_stock_price_knocked_in - self.strike, 0)
         present_reward_values = payoffs * np.exp(-self.risk_free_rate * self._time)
         fair_value = np.sum(present_reward_values) / self.simulations
         knocked_in_pct = knocked_in.mean() * 100
@@ -74,7 +102,7 @@ class BarrierMonteCarloSimulation:
             "total_trading_days": total_trading_days,
             "fair_value": fair_value,
             "knocked_in_pct": knocked_in_pct,
-            "final_price_vested": stock_paths[knocked_in, -1].mean(),
+            "final_price_knocked_in": stock_paths[knocked_in, -1].mean(),
             "final_price_all_runs": stock_paths[:, -1].mean(),
             "percentiles": percentiles,
         }
