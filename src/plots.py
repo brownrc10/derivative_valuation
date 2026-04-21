@@ -1,4 +1,5 @@
 import datetime
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -17,6 +18,7 @@ class PlotsGenerator:
             start=datetime.date(2024, 4, 30),
             periods=simulation_payload["total_trading_days"],
         )
+        # self.plots_path = Path.cwd() / "results" / label
 
     def _plot_final_price_distribution(self):
         stock_paths = self.payload["stock_paths"]
@@ -26,14 +28,14 @@ class PlotsGenerator:
         knocked_in_final = stock_paths[knocked_in, -1]
         not_knocked_in_final = stock_paths[~knocked_in, -1]
 
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(7, 5))
         sns.histplot(
             all_final, ax=ax, label="All Paths", color="steelblue", alpha=0.4, bins=100
         )
         sns.histplot(
             knocked_in_final,
             ax=ax,
-            label="Knocked-In",
+            label="Up-and-In",
             color="green",
             alpha=0.4,
             bins=100,
@@ -41,7 +43,7 @@ class PlotsGenerator:
         sns.histplot(
             not_knocked_in_final,
             ax=ax,
-            label="Not Knocked-In",
+            label="Not Up-and-In",
             color="red",
             alpha=0.4,
             bins=100,
@@ -60,12 +62,12 @@ class PlotsGenerator:
             label=f"Strike ${self.strike:.2f}",
         )
 
-        ax.set_title("Distribution of Final Stock Prices")
+        ax.set_title(f"Distribution of Final Stock Prices-{self.label}")
         ax.set_xlabel("Final Stock Price")
         ax.set_ylabel("Count")
         ax.legend()
         plt.tight_layout()
-        plt.savefig(f"{self.label}")
+        plt.savefig(f"results/{self.label}-distribution.png")
         # plt.show()
 
     def _plot_payoff_distribution(self):
@@ -74,9 +76,8 @@ class PlotsGenerator:
 
         final_prices = stock_paths[knocked_in, -1]
         payoffs = np.maximum(final_prices - self.strike, 0)
-        payoffs_discounted = self.payload["fair_value"]
 
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(7, 5))
         sns.histplot(payoffs, ax=ax, color="green", alpha=0.6, bins=100)
 
         ax.axvline(
@@ -92,20 +93,21 @@ class PlotsGenerator:
             label=f"Median Payoff ${np.median(payoffs):.2f}",
         )
 
-        ax.set_title("Distribution of Option Payoffs (Knocked-In Paths Only)")
+        ax.set_title(
+            f"Distribution of Option Payoffs (Up-and-In Paths Only)-{self.label}"
+        )
         ax.set_xlabel("Payoff")
         ax.set_ylabel("Count")
         ax.legend()
         plt.tight_layout()
-        plt.savefig(f"pay_off-{self.label}")
+        plt.savefig(f"results/payoff-{self.label}.png")
         # plt.show()
 
     def _plot_sample_paths(self, n_paths: int = 200):
         stock_paths = self.payload["stock_paths"]
         knocked_in = self.payload["knocked_in"]
-        total_days = self.payload["total_trading_days"]
 
-        fig, ax = plt.subplots(figsize=(14, 7))
+        fig, ax = plt.subplots(figsize=(7, 5))
 
         for i in np.where(~knocked_in)[0][: n_paths // 2]:
             ax.plot(
@@ -140,22 +142,21 @@ class PlotsGenerator:
             label=f"Strike ${self.strike:.2f}",
         )
 
-        ax.plot([], [], color="green", alpha=0.5, label="Knocked-In Paths")
-        ax.plot([], [], color="red", alpha=0.5, label="Not Knocked-In Paths")
+        ax.plot([], [], color="green", alpha=0.5, label="Up-and-In Paths")
+        ax.plot([], [], color="red", alpha=0.5, label="Not Up-and-In Paths")
 
-        ax.set_title("Simulated Stock Price Paths")
+        ax.set_title(f"Simulated Stock Price Paths-{self.label}")
         ax.set_xlabel("Time (Years)")
         ax.set_ylabel("Stock Price")
         ax.legend()
         plt.tight_layout()
-        plt.show()
+        plt.savefig(f"results/sample-paths-{self.label}.png")
+        # plt.show()
 
     def _plot_percentile_fan(self):
-        stock_paths = self.payload["stock_paths"]
         percentiles = self.payload["percentiles"]
-        total_days = self.payload["total_trading_days"]
 
-        fig, ax = plt.subplots(figsize=(14, 7))
+        fig, ax = plt.subplots(figsize=(7, 5))
 
         ax.fill_between(
             self.business_days,
@@ -196,12 +197,13 @@ class PlotsGenerator:
             label=f"Strike ${self.strike:.2f}",
         )
 
-        ax.set_title("Simulated Stock Price Paths — Percentile Fan Chart")
+        ax.set_title(f"Simulated Stock Price Paths — Percentile Fan Chart-{self.label}")
         ax.set_xlabel("Time (Years)")
         ax.set_ylabel("Stock Price")
         ax.legend()
         plt.tight_layout()
-        plt.show()
+        plt.savefig(f"results/percentile-{self.label}.png")
+        # plt.show()
 
     def _plot_comparison(self, analytical_prices: dict, mc_prices: dict):
         labels = list(analytical_prices.keys())
@@ -211,13 +213,13 @@ class PlotsGenerator:
         x = np.arange(len(labels))
         width = 0.35
 
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(7, 5))
 
         bars1 = ax.bar(
             x - width / 2,
             analytical_vals,
             width,
-            label="Analytical BS",
+            label="Analytical Black-Scholes",
             color="steelblue",
             alpha=0.7,
         )
@@ -244,14 +246,18 @@ class PlotsGenerator:
                 fontsize=9,
             )
 
-        ax.set_title("Analytical BS vs Monte Carlo Fair Value by Vol Estimate")
+        ax.set_title(
+            "Analytical Black Scholes vs Monte Carlo Fair Value by Vol Estimate"
+        )
         ax.set_xlabel("Volatility Estimate")
         ax.set_ylabel("Option Fair Value ($)")
         ax.set_xticks(x)
         ax.set_xticklabels(labels)
         ax.legend()
         plt.tight_layout()
-        plt.show()
+        print(f"PLOT LOCATION {self.plots_path}")
+        plt.savefig(f"results/plot_comparison.png")
+        # plt.show()
 
     def generate_plots(self):
         self._plot_final_price_distribution()

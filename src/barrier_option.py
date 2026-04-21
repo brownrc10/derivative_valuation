@@ -1,7 +1,5 @@
 import numpy as np
 from scipy.stats import norm
-from scipy.stats import norm
-import numpy as np
 
 
 class BarrierOption:
@@ -56,107 +54,57 @@ class BarrierOption:
         ) / (self.volatility * np.sqrt(self._time))
 
     def _up_and_out_call(self):
-        # S = self.stock_price
-        # K = self.strike
-        # b = self.barrier
-        # r = self.risk_free_rate
-        # v = self.volatility
-        # T = self._time
+        S = self.stock_price
+        K = self.strike
+        b = self.barrier
+        r = self.risk_free_rate
+        v = self.volatility
+        T = self._time
 
         power1 = (2 * (self.risk_free_rate - self.dividend_yield)) / self.volatility**2
         power2 = (
             1 - (2 * (self.risk_free_rate - self.dividend_yield)) / self.volatility**2
         )
-
-        # term_1 = S * (norm.cdf(self._delta(S / K, 1)) - norm.cdf(self._delta(S / b, 1)))
-        term_1 = self.stock_price * (
-            norm.cdf(self._delta(self.stock_price / self.strike, 1))
-            - norm.cdf(self._delta(self.stock_price / self.barrier, 1))
-        )
-
-        # term_2 = (
-        #     b
-        #     * (b / S) ** power1
-        #     * (
-        #         norm.cdf(self._delta(b**2 / (K * S), 1))
-        #         - norm.cdf(self._delta(b / S, 1))
-        #     )
-        # )
+        term_1 = S * (norm.cdf(self._delta(S / K, 1)) - norm.cdf(self._delta(S / b, 1)))
 
         term_2 = (
-            self.barrier
-            * (self.barrier / self.stock_price) ** power1
+            b
+            * (b / S) ** power1
             * (
-                norm.cdf(
-                    self._delta(self.barrier**2 / (self.strike * self.stock_price), 1)
-                )
-                - norm.cdf(self._delta(self.barrier / self.stock_price, 1))
+                norm.cdf(self._delta(b**2 / (K * S), 1))
+                - norm.cdf(self._delta(b / S, 1))
             )
         )
-
-        # term_3 = (
-        #     K
-        #     * np.exp(-r * T)
-        #     * (norm.cdf(self._delta(S / K, -1)) - norm.cdf(self._delta(S / b, -1)))
-        # )
-
         term_3 = (
-            self.strike
-            * np.exp(-self.risk_free_rate * self._time)
-            * (
-                norm.cdf(self._delta(self.stock_price / self.strike, -1))
-                - norm.cdf(self._delta(self.stock_price / self.barrier, -1))
-            )
+            K
+            * np.exp(-r * T)
+            * (norm.cdf(self._delta(S / K, -1)) - norm.cdf(self._delta(S / b, -1)))
         )
-
-        # term_4 = (
-        #     K
-        #     * np.exp(-r * T)
-        #     * (S / b) ** power2
-        #     * (
-        #         norm.cdf(self._delta(b**2 / (K * S), -1))
-        #         - norm.cdf(self._delta(b / S, -1))
-        #     )
-        # )
-
         term_4 = (
-            self.strike
-            * np.exp(-self.risk_free_rate * self._time)
-            * (self.stock_price / self.barrier) ** power2
+            K
+            * np.exp(-r * T)
+            * (S / b) ** power2
             * (
-                norm.cdf(
-                    self._delta(self.barrier**2 / (self.strike * self.stock_price), -1)
-                )
-                - norm.cdf(self._delta(self.barrier / self.stock_price, -1))
+                norm.cdf(self._delta(b**2 / (K * S), -1))
+                - norm.cdf(self._delta(b / S, -1))
             )
         )
-
         return term_1 - term_2 - term_3 + term_4
 
     def _vanilla_call(self):
-        # S = self.stock_price
-        # K = self.strike
-        # r = self.risk_free_rate
-        # q = self.dividend_yield
-        # v = self.volatility
-        # T = self._time
-        d1 = (
-            np.log(self.stock_price / self.strike)
-            + (self.risk_free_rate - self.dividend_yield + 0.5 * self.volatility**2)
-            * self._time
-        ) / (self.volatility * np.sqrt(self._time))
-        d2 = d1 - self.volatility * np.sqrt(self._time)
+        S = self.stock_price
+        K = self.strike
+        r = self.risk_free_rate
+        q = self.dividend_yield
+        v = self.volatility
+        T = self._time
 
-        # d1 = (np.log(S / K) + (r - q + 0.5 * v**2) * T) / (v * np.sqrt(T))
-        # d2 = d1 - v * np.sqrt(T)
-        #  return S * np.exp(-q * T) * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
-
-        return self.stock_price * np.exp(-self.dividend_yield * self._time) * norm.cdf(
-            d1
-        ) - self.strike * np.exp(-self.risk_free_rate * self._time) * norm.cdf(d2)
+        d1 = (np.log(S / K) + (r - q + 0.5 * v**2) * T) / (v * np.sqrt(T))
+        d2 = d1 - v * np.sqrt(T)
+        return S * np.exp(-q * T) * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
 
     def up_and_in_call(self):
         vanilla_call = self._vanilla_call()
         up_and_out = self._up_and_out_call()
-        print(f"Vanilla {vanilla_call}, Up_and_Out {up_and_out}")
+        # print(f"Vanilla {vanilla_call}, Up_and_Out {up_and_out}")
         return vanilla_call - up_and_out

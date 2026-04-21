@@ -25,7 +25,7 @@ class StockData:
 
     stock_file_path: str
     valuation_date: str
-    dividend_yield: float = field(default=0.0109)
+    dividend_yield: float = field(default=0.0112)
     risk_free_rate: float = field(default=0.0)
 
     def __post_init__(self):
@@ -161,9 +161,7 @@ class StockData:
 
         """
         hist = self._calculate_historical_volatility()
-        rolling = pd.concat(
-            [self._calculate_rolling_volatility(d) for d in [90, 180, 252, 504]]
-        )
+        rolling = pd.concat([self._calculate_rolling_volatility(d) for d in [30, 180]])
         self._calculate_risk_free_rate(BASE_URL, API_KEY)
 
         self.summary = {
@@ -172,17 +170,11 @@ class StockData:
             "dividend_yield": hist["dividend_yield"].iloc[0],
             "risk_free_rate": self.risk_free_rate,
             "historical_vol": hist["annualized_vol"].iloc[0],
-            "rolling_vol_90d": rolling.loc[
-                rolling["window_days"] == 90, "rolling_vol"
+            "rolling_vol_30d": rolling.loc[
+                rolling["window_days"] == 30, "rolling_vol"
             ].iloc[0],
             "rolling_vol_180d": rolling.loc[
                 rolling["window_days"] == 180, "rolling_vol"
-            ].iloc[0],
-            "rolling_vol_252d": rolling.loc[
-                rolling["window_days"] == 252, "rolling_vol"
-            ].iloc[0],
-            "rolling_vol_504d": rolling.loc[
-                rolling["window_days"] == 504, "rolling_vol"
             ].iloc[0],
         }
         return self.summary
